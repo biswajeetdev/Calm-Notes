@@ -6,14 +6,18 @@ import { registerBillingRoutes, getUserSubscription, getUserUsage, PLANS, type P
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { db } from "./db";
-import { usage } from "@shared/schema";
+import { usage, type InsertNote } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import rateLimit from "express-rate-limit";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+if (!openai) {
+  console.warn("OPENAI_API_KEY not set — AI generation disabled");
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -59,10 +63,13 @@ export async function registerRoutes(
   app.post(api.notes.create.path, isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const noteData = { ...req.body, userId };
-      
-      const input = api.notes.create.input.parse(noteData);
-      const note = await storage.createNote(input);
+
+      const inputWithoutUser = api.notes.create.input.parse(req.body);
+      const notePayload: InsertNote = {
+        ...inputWithoutUser,
+        userId,
+      };
+      const note = await storage.createNote(notePayload);
       res.status(201).json(note);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -89,8 +96,12 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Unauthorized access to note" });
       }
 
-      const input = api.notes.update.input.parse(req.body);
-      const updatedNote = await storage.updateNote(noteId, input);
+      const inputWithoutUser = api.notes.update.input.parse(req.body);
+      const updatePayload: Partial<InsertNote> = {
+        ...inputWithoutUser,
+        userId,
+      };
+      const updatedNote = await storage.updateNote(noteId, updatePayload);
       res.json(updatedNote);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -132,6 +143,9 @@ export async function registerRoutes(
 
     const PDFDocument = (await import("pdfkit")).default;
     const doc = new PDFDocument({ margin: 50, size: "LETTER" });
+
+    // Clean up PDF stream if client disconnects
+    req.on("close", () => { if (!res.writableFinished) doc.end(); });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -189,6 +203,10 @@ export async function registerRoutes(
   // Generate Note using AI (with usage gating)
   app.post(api.notes.generate.path, isAuthenticated, async (req, res) => {
     try {
+      if (!openai) {
+        return res.status(503).json({ message: "AI generation not configured. Set OPENAI_API_KEY." });
+      }
+
       const userId = (req.user as any).id;
 
       // Check usage limits

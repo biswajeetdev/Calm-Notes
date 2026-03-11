@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, User, ArrowLeft, Trash2, Edit2, Check, X, Copy } from "lucide-react";
+import { Calendar, Clock, User, ArrowLeft, Trash2, Edit2, Check, X, Copy, Download } from "lucide-react";
 import { useRoute, Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
@@ -81,6 +81,10 @@ export default function NoteDetail() {
     toast({ title: "Copied", description: "Note content copied to clipboard." });
   };
 
+  const downloadPdf = () => {
+    window.open(`/api/notes/${note.id}/export/pdf`, "_blank");
+  };
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto">
@@ -91,6 +95,9 @@ export default function NoteDetail() {
              </Button>
           </Link>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={downloadPdf} className="gap-2">
+              <Download className="w-4 h-4" /> PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={copyToClipboard} className="gap-2">
               <Copy className="w-4 h-4" /> Copy
             </Button>
@@ -188,7 +195,9 @@ export default function NoteDetail() {
           
           {/* Metadata Footer */}
           <div className="text-xs text-muted-foreground text-center pt-8 pb-4">
-             Note ID: {note.id} • Created: {format(new Date(note.createdAt!), "PPP")} • Last Updated: {format(new Date(note.updatedAt!), "PPP")}
+             Note ID: {note.id}
+             {note.createdAt && ` • Created: ${format(new Date(note.createdAt), "PPP")}`}
+             {note.updatedAt && ` • Last Updated: ${format(new Date(note.updatedAt), "PPP")}`}
           </div>
         </div>
       </div>

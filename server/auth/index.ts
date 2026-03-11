@@ -3,15 +3,30 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
+import rateLimit from "express-rate-limit";
 import type { Express, RequestHandler } from "express";
 import { db } from "../db";
 import { users, type User } from "@shared/models/auth";
 import { eq } from "drizzle-orm";
 
+// Strict rate limit for auth endpoints (5 attempts per 15 min)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts, please try again later" },
+});
+
 // ─── Session Setup ───────────────────────────────────────────────
 export function setupAuth(app: Express) {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const PgStore = connectPg(session);
+
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret || sessionSecret.length < 32) {
+    throw new Error("SESSION_SECRET must be set and at least 32 characters long");
+  }
 
   app.set("trust proxy", 1);
 
@@ -22,12 +37,13 @@ export function setupAuth(app: Express) {
         createTableIfMissing: true,
         tableName: "sessions",
       }),
-      secret: process.env.SESSION_SECRET || "calm-notes-dev-secret",
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: sessionTtl,
       },
     })
@@ -82,7 +98,7 @@ export function setupAuth(app: Express) {
 // ─── Auth Routes ────────────────────────────────────────────────
 export function registerAuthRoutes(app: Express) {
   // Register
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", authLimiter, async (req, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
 
@@ -129,7 +145,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Login
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", authLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) {

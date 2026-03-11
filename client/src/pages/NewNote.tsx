@@ -87,15 +87,13 @@ export default function NewNote() {
     try {
       const result = await createNote.mutateAsync({
         clientName: data.clientName,
-        sessionDate: new Date(data.sessionDate), // Using string date from input type="datetime-local"
+        sessionDate: new Date(data.sessionDate),
         sessionType: data.sessionType,
         riskFlags: data.riskFlags,
         rawNotes: data.rawNotes,
         selectedFormat: data.format,
-        structuredOutput: { content: generatedContent }, // Storing simple object for MVP
-        userId: "current-user", // Backend handles this from session usually, but schema requires it. 
-                                // Ideally backend infers from session. We'll send a placeholder or let backend override.
-      });
+        structuredOutput: { content: generatedContent },
+      } as any);
       setLocation(`/notes/${result.id}`);
     } catch (error) {
       console.error(error);

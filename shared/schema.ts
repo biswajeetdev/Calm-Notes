@@ -1,5 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { pgTable, text, serial, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -31,7 +30,12 @@ export const notes = pgTable("notes", {
 export const insertNoteSchema = createInsertSchema(notes).omit({ 
   id: true, 
   createdAt: true, 
-  updatedAt: true 
+  updatedAt: true,
+});
+
+// Schema for API input (userId is always set server-side)
+export const noteInputSchema = insertNoteSchema.omit({
+  userId: true,
 });
 
 // === EXPLICIT API CONTRACT TYPES ===
@@ -41,8 +45,8 @@ export type Note = typeof notes.$inferSelect;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 
 // Request types
-export type CreateNoteRequest = InsertNote;
-export type UpdateNoteRequest = Partial<InsertNote>;
+export type CreateNoteRequest = z.infer<typeof noteInputSchema>;
+export type UpdateNoteRequest = Partial<CreateNoteRequest>;
 
 // Response types
 export type NoteResponse = Note;

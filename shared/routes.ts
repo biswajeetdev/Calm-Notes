@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertNoteSchema, notes } from './schema';
+import { insertNoteSchema, noteInputSchema, notes } from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -45,7 +45,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/notes' as const,
-      input: insertNoteSchema,
+      input: noteInputSchema,
       responses: {
         201: z.custom<typeof notes.$inferSelect>(),
         400: errorSchemas.validation,
@@ -55,7 +55,7 @@ export const api = {
     update: {
       method: 'PUT' as const,
       path: '/api/notes/:id' as const,
-      input: insertNoteSchema.partial(),
+      input: noteInputSchema.partial(),
       responses: {
         200: z.custom<typeof notes.$inferSelect>(),
         400: errorSchemas.validation,
